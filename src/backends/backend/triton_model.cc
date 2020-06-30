@@ -30,6 +30,7 @@
 #include "src/backends/backend/tritonbackend.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
+#include "src/core/metric_model_reporter.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/server_message.h"
 #include "src/core/tritonserver.h"
@@ -261,6 +262,54 @@ TRITONBACKEND_ModelSetState(TRITONBACKEND_Model* model, void* state)
 {
   TritonModel* tm = reinterpret_cast<TritonModel*>(model);
   tm->SetState(state);
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelReportStatistics(
+    TRITONBACKEND_Model* model, TRITONBACKEND_Request* request,
+    const bool success, const int device, const uint64_t exec_start_ns,
+    const uint64_t compute_start_ns, const uint64_t compute_end_ns,
+    const uint64_t exec_end_ns)
+{
+  //  TritonModel* tm = reinterpret_cast<TritonModel*>(model);
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+
+  std::unique_ptr<MetricModelReporter> metric_reporter;
+#ifdef TRITON_ENABLE_METRICS
+// FIXME
+//  if (Metrics::Enabled()) {
+//    metric_reporter.reset(new MetricModelReporter(
+//        Name(), Version(), device, Config().metric_tags()));
+//  }
+#endif  // TRITON_ENABLE_METRICS
+
+  tr->ReportStatistics(
+      metric_reporter.get(), success, exec_start_ns, compute_start_ns,
+      compute_end_ns, exec_end_ns);
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelReportBatchStatistics(
+    TRITONBACKEND_Model* model, const uint64_t batch_size,
+    const uint64_t exec_start_ns, const uint64_t compute_start_ns,
+    const uint64_t compute_end_ns, const uint64_t exec_end_ns)
+{
+  TritonModel* tm = reinterpret_cast<TritonModel*>(model);
+
+  std::unique_ptr<MetricModelReporter> metric_reporter;
+#ifdef TRITON_ENABLE_METRICS
+// FIXME
+//  if (Metrics::Enabled()) {
+//    metric_reporter.reset(new MetricModelReporter(
+//        Name(), Version(), device, Config().metric_tags()));
+//  }
+#endif  // TRITON_ENABLE_METRICS
+
+  tm->MutableStatsAggregator()->UpdateInferBatchStats(
+      metric_reporter.get(), batch_size, exec_start_ns, compute_start_ns,
+      compute_end_ns, exec_end_ns);
   return nullptr;  // success
 }
 
